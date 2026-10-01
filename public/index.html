@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Capsulog - Gestione Inventario Caffè</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="logo">
+                    <i class="ri-cup-line"></i>
+                    <span>Capsulog</span>
+                </div>
+                <div class="nav-menu">
+                    <button class="nav-item active" data-page="dashboard">
+                        <i class="ri-dashboard-line"></i> Dashboard
+                    </button>
+                    <button class="nav-item" data-page="manage">
+                        <i class="ri-list-settings-line"></i> Gestione
+                    </button>
+                    <button class="nav-item" data-page="settings">
+                        <i class="ri-settings-4-line"></i> Impostazioni
+                    </button>
+                </div>
+                <div class="notification-area">
+                    <div class="bell-icon" id="bell-icon">
+                        <i class="ri-notification-3-line"></i>
+                        <span class="badge hidden" id="notification-badge">0</span>
+                        <div class="notification-dropdown" id="notification-dropdown">
+                            <div class="notification-header"><i class="ri-notification-line"></i> Notifiche</div>
+                            <div id="notification-list"></div>
+                        </div>
+                    </div>
+                    <div class="theme-toggle">
+                        <button id="theme-light"><i class="ri-sun-line"></i></button>
+                        <button id="theme-dark"><i class="ri-moon-line"></i></button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Magazzino Switcher (per Dashboard) -->
+        <div class="magazzino-switcher">
+            <button class="magazzino-btn active" data-magazzino="Ufficio">
+                <i class="ri-building-line"></i> Ufficio
+                <span class="magazzino-count" id="count-ufficio">0</span>
+            </button>
+            <button class="magazzino-btn" data-magazzino="Casa">
+                <i class="ri-home-line"></i> Casa
+                <span class="magazzino-count" id="count-casa">0</span>
+            </button>
+        </div>
+
+        <!-- Pagina Dashboard -->
+        <div id="dashboard-page" class="page active">
+            <div class="stats-grid" id="stats"></div>
+            <div class="sorting-bar">
+                <div class="sort-group">
+                    <button class="sort-btn" data-sort="nome">
+                        <span class="sort-icon"><i class="ri-sort-alphabet-asc"></i></span> Nome
+                    </button>
+                    <button class="sort-btn" data-sort="quantita">
+                        <span class="sort-icon"><i class="ri-sort-number-desc"></i></span> Quantità
+                    </button>
+                    <button class="sort-btn" data-sort="categoria">
+                        <span class="sort-icon"><i class="ri-layout-grid-line"></i></span> Categoria
+                    </button>
+                </div>
+                <div class="sort-group">
+                    <button class="sort-btn filter-btn" data-filter="all"><i class="ri-apps-2-line"></i> Tutti</button>
+                    <button class="sort-btn filter-btn" data-filter="Caffè"><i class="ri-cup-line"></i> Caffè</button>
+                    <button class="sort-btn filter-btn" data-filter="Bevande Calde"><i class="ri-tea-line"></i> Bevande Calde</button>
+                </div>
+            </div>
+            <div id="caffe-list" class="coffee-grid"></div>
+        </div>
+
+        <!-- Pagina Gestione -->
+        <div id="manage-page" class="page">
+            <div class="manage-header">
+                <h2><i class="ri-list-settings-line"></i> Catalogo completo</h2>
+                <button id="new-coffee-btn" class="add-btn"><i class="ri-add-line"></i> Nuovo Caffè</button>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem;display:flex;gap:1rem;">
+                <span><i class="ri-building-line"></i> Ufficio: <strong id="manage-count-ufficio">0</strong></span>
+                <span><i class="ri-home-line"></i> Casa: <strong id="manage-count-casa">0</strong></span>
+            </div>
+            <div id="manage-list"></div>
+        </div>
+
+        <!-- Pagina Impostazioni -->
+        <div id="settings-page" class="page">
+            <div class="settings-card">
+                <h2><i class="ri-settings-4-line"></i> Preferenze</h2>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label"><i class="ri-alert-line"></i> Soglia scorta minima</div>
+                        <div class="setting-description">Avvisa quando la quantità è inferiore o uguale a questa cifra</div>
+                    </div>
+                    <input type="number" id="low-stock-threshold" value="3" style="width: 80px;">
+                </div>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label"><i class="ri-download-2-line"></i> Esporta dati</div>
+                        <div class="setting-description">Download backup JSON</div>
+                    </div>
+                    <button id="export-data" class="btn btn-secondary"><i class="ri-download-line"></i> Esporta</button>
+                </div>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label"><i class="ri-upload-2-line"></i> Importa dati</div>
+                        <div class="setting-description">Ripristina inventario da file JSON</div>
+                    </div>
+                    <input type="file" id="import-file" accept=".json" style="width: auto;">
+                </div>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label"><i class="ri-delete-bin-line"></i> Reset completo</div>
+                        <div class="setting-description">Cancella l'intero archivio</div>
+                    </div>
+                    <button id="reset-data" class="btn btn-danger"><i class="ri-delete-bin-line"></i> Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nuovo/Modifica Caffè -->
+    <div id="coffee-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="ri-add-line"></i> <span id="modal-title">Nuovo Caffè</span></h3>
+                <button class="close-modal" id="close-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label><i class="ri-cup-line"></i> Nome *</label>
+                <input type="text" id="nome" placeholder="Es: Espresso Crema">
+            </div>
+            <div class="form-group">
+                <label><i class="ri-store-line"></i> Marca (opzionale)</label>
+                <input type="text" id="marca" placeholder="Es: Lavazza">
+            </div>
+            <div class="form-group">
+                <label><i class="ri-taste-line"></i> Gusto (opzionale)</label>
+                <input type="text" id="gusto" placeholder="Es: Intenso">
+            </div>
+            <div class="form-group">
+                <label><i class="ri-price-tag-3-line"></i> Categoria</label>
+                <select id="categoria">
+                    <option value="Caffè">Caffè</option>
+                    <option value="Bevande Calde">Bevande Calde</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="ri-store-2-line"></i> Magazzino</label>
+                <select id="magazzino">
+                    <option value="Ufficio">Ufficio</option>
+                    <option value="Casa">Casa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="ri-stack-line"></i> Quantità iniziale</label>
+                <input type="number" id="quantita" value="0" min="0">
+            </div>
+            <div class="form-actions">
+                <button id="save-btn" class="btn btn-primary"><i class="ri-save-line"></i> Salva</button>
+                <button id="cancel-modal-btn" class="btn btn-secondary"><i class="ri-close-line"></i> Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Trasferimento -->
+    <div id="trasferisci-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="ri-exchange-line"></i> Trasferisci tra magazzini</h3>
+                <button class="close-modal" id="close-trasferisci-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <input type="hidden" id="trasferisci-id">
+            <div class="form-group">
+                <label><i class="ri-cup-line"></i> Nome</label>
+                <input type="text" id="trasferisci-nome" disabled style="opacity:0.7;">
+            </div>
+            <div class="form-group">
+                <label><i class="ri-store-2-line"></i> Da</label>
+                <input type="text" id="trasferisci-da" disabled style="opacity:0.7;">
+            </div>
+            <div class="form-group">
+                <label><i class="ri-store-2-line"></i> A</label>
+                <select id="trasferisci-a">
+                    <option value="Ufficio">Ufficio</option>
+                    <option value="Casa">Casa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="ri-stack-line"></i> Quantità</label>
+                <input type="number" id="trasferisci-quantita" value="1" min="1">
+            </div>
+            <div class="form-actions">
+                <button id="trasferisci-confirm" class="btn btn-primary"><i class="ri-exchange-line"></i> Trasferisci</button>
+                <button id="trasferisci-cancel" class="btn btn-secondary"><i class="ri-close-line"></i> Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Refill -->
+    <div id="refill-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="ri-add-circle-line"></i> Refill</h3>
+                <button class="close-modal" id="close-refill-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <p style="margin-bottom:1rem;font-size:0.875rem;">Quante capsule vuoi aggiungere?</p>
+            <input type="number" id="refill-quantity" value="5" min="1">
+            <div class="form-actions">
+                <button id="refill-confirm" class="btn btn-primary"><i class="ri-check-line"></i> Conferma</button>
+                <button id="refill-cancel" class="btn btn-secondary"><i class="ri-close-line"></i> Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/utils.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="/js/notifications.js"></script>
+    <script src="/js/modals.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/manage.js"></script>
+    <script src="/js/trasferisci.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

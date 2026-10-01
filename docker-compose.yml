@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  capsulog:
+    build: .
+    container_name: capsulog
+    ports:
+      - "4316:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

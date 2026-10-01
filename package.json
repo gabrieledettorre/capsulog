@@ -1,0 +1,13 @@
+{
+  "name": "capsulog",
+  "version": "1.0.0",
+  "description": "Gestione Inventario Caffè e Bevande Calde",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
