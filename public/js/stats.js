@@ -45,7 +45,23 @@ function formatLocalDate(d) {
 
 function getHeatLevel(quantita, max) {
     if (quantita === 0) return 0;
-    if (max <= 0) return 1;
+    
+    // Scala mista basata su valori assoluti quando i numeri sono piccoli
+    // Altrimenti proporzionale al massimo
+    
+    // Caso max molto piccolo (uso personale, 1-2 caffè al giorno)
+    if (max <= 2) {
+        return quantita >= max ? 4 : 2;
+    }
+    
+    if (max <= 5) {
+        if (quantita === 1) return 1;
+        if (quantita === 2) return 2;
+        if (quantita === 3) return 3;
+        return 4;
+    }
+    
+    // max grande: scala proporzionale
     const ratio = quantita / max;
     if (ratio <= 0.25) return 1;
     if (ratio <= 0.5) return 2;

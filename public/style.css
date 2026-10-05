@@ -673,7 +673,7 @@ input, select {
 }
 
 /* ============================
-   HEATMAP (colori adattivi al tema)
+   HEATMAP
    ============================ */
 .heatmap-container {
     overflow-x: auto;
@@ -785,50 +785,72 @@ input, select {
     width: 20px;
     height: 20px;
     border-radius: 4px;
-    background: var(--bg-input);
-    border: 1px solid rgba(255, 255, 255, 0.04);
     cursor: pointer;
     transition: transform 0.12s, box-shadow 0.12s;
     position: relative;
+    border: 1px solid transparent;
 }
 
 .heatmap-cell:hover {
     transform: scale(1.25);
     z-index: 10;
-    box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 0 0 2px var(--text-primary), 0 4px 12px rgba(0,0,0,0.4);
 }
 
-/* Livelli di intensità - adattivi al tema */
+/* ===== DARK THEME (default) ===== */
 .heatmap-cell.level-0 { 
-    background: var(--bg-input); 
-    border-color: rgba(255, 255, 255, 0.04);
+    background: #26150c;
+    border-color: #3d2618;
 }
 .heatmap-cell.level-1 { 
-    background: color-mix(in srgb, var(--accent) 25%, var(--bg-input));
-    border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+    background: #4a2f1f;
+    border-color: #5a3a28;
 }
 .heatmap-cell.level-2 { 
-    background: color-mix(in srgb, var(--accent) 50%, var(--bg-input));
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: #7a5538;
+    border-color: #8a6245;
 }
 .heatmap-cell.level-3 { 
-    background: color-mix(in srgb, var(--accent) 75%, var(--bg-input));
-    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+    background: #b08a5c;
+    border-color: #c09a6c;
 }
 .heatmap-cell.level-4 { 
-    background: var(--accent);
-    border-color: var(--accent);
-    box-shadow: inset 0 0 8px rgba(255,255,255,0.1);
-}
-
-[data-theme="light"] .heatmap-cell.level-4 {
-    box-shadow: inset 0 0 6px rgba(0,0,0,0.08);
+    background: #dcc7aa;
+    border-color: #e8d4b0;
+    box-shadow: 0 0 6px rgba(220, 199, 170, 0.35);
 }
 
 .heatmap-cell.level-futuro { 
     background: transparent; 
     border: 1px dashed var(--border);
-    opacity: 0.4;
+    opacity: 0.3;
+}
+
+/* ===== LIGHT THEME ===== */
+[data-theme="light"] .heatmap-cell.level-0 { 
+    background: #f5e6ca;
+    border-color: #e8dcc8;
+}
+[data-theme="light"] .heatmap-cell.level-1 { 
+    background: #e8d4b0;
+    border-color: #dcc7aa;
+}
+[data-theme="light"] .heatmap-cell.level-2 { 
+    background: #c9a878;
+    border-color: #b89768;
+}
+[data-theme="light"] .heatmap-cell.level-3 { 
+    background: #8b6a48;
+    border-color: #7a5c3f;
+}
+[data-theme="light"] .heatmap-cell.level-4 { 
+    background: #4a3020;
+    border-color: #3b2314;
+    box-shadow: 0 0 6px rgba(74, 48, 32, 0.3);
+}
+
+[data-theme="light"] .heatmap-cell.level-futuro {
+    border-color: #e8dcc8;
 }
 
 .heatmap-legend {
