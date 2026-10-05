@@ -9,7 +9,6 @@ async function loadStats() {
     renderTopCaffe(data.topCaffe);
     renderTopRefill(data.topRefill);
     renderPerCategoria(data.perCategoria);
-    renderPerMagazzino(data.perMagazzino);
 }
 
 function renderOverview(data) {
@@ -36,48 +35,84 @@ function renderOverview(data) {
     `;
 }
 
+// Helper ROBUSTO: ritorna YYYY-MM-DD nel fuso locale del browser
+function formatLocalDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function getHeatLevel(quantita, max) {
+    if (quantita === 0) return 0;
+    if (max <= 0) return 1;
+    const ratio = quantita / max;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
+}
+
 function renderHeatmap(heatmap, giorni) {
     const container = document.getElementById('heatmap-container');
     if (!container) return;
     
-    // Mostra sempre almeno 12 settimane (84 giorni), oppure estendi in base al periodo
     const numGiorni = Math.max(84, giorni);
+    
+    // Normalizza le chiavi heatmap: estrai solo YYYY-MM-DD
+    const heatmapNorm = {};
+    Object.keys(heatmap || {}).forEach(k => {
+        const key = String(k).substring(0, 10);
+        heatmapNorm[key] = (heatmapNorm[key] || 0) + (heatmap[k] || 0);
+    });
+    
+    // OGGI in formato YYYY-MM-DD locale
     const oggi = new Date();
-    oggi.setHours(0, 0, 0, 0);
+    const oggiStr = formatLocalDate(oggi);
     
-    // Trova il lunedì della settimana più vecchia
-    const inizio = new Date(oggi);
-    inizio.setDate(inizio.getDate() - numGiorni + 1);
-    const dayOfWeek = (inizio.getDay() + 6) % 7; // 0 = lunedì
-    inizio.setDate(inizio.getDate() - dayOfWeek);
+    // Data di inizio: numGiorni fa
+    const inizioData = new Date(oggi);
+    inizioData.setDate(inizioData.getDate() - numGiorni + 1);
     
-    // Calcola max e totale per scalatura e statistiche
-    const maxConsumo = Math.max(1, ...Object.values(heatmap || {}));
-    const totPeriodo = Object.values(heatmap || {}).reduce((s, v) => s + v, 0);
-    const giorniAttivi = Object.values(heatmap || {}).filter(v => v > 0).length;
+    // Arretra al lunedì della settimana
+    const dow = (inizioData.getDay() + 6) % 7; // 0 = lunedì
+    inizioData.setDate(inizioData.getDate() - dow);
     
     // Costruisci settimane
     const settimane = [];
-    let corrente = new Date(inizio);
-    while (corrente <= oggi) {
+    const corrente = new Date(inizioData);
+    
+    while (formatLocalDate(corrente) <= oggiStr) {
         const settimana = [];
         for (let d = 0; d < 7; d++) {
-            const dataStr = corrente.toISOString().split('T')[0];
+            const dataStr = formatLocalDate(corrente);
+            const dataObj = new Date(corrente);
+            const futuro = dataStr > oggiStr;
             settimana.push({
                 data: dataStr,
-                dataObj: new Date(corrente),
-                futuro: corrente > oggi,
-                quantita: heatmap[dataStr] || 0
+                dataObj,
+                futuro,
+                quantita: futuro ? 0 : (heatmapNorm[dataStr] || 0)
             });
             corrente.setDate(corrente.getDate() + 1);
         }
         settimane.push(settimana);
     }
     
+    // Debug
+    console.log('[HEATMAP] oggi:', oggiStr);
+    console.log('[HEATMAP] settimane:', settimane.length);
+    console.log('[HEATMAP] chiavi:', Object.keys(heatmapNorm));
+    
+    // Statistiche
+    const valori = Object.values(heatmapNorm);
+    const maxConsumo = valori.length > 0 ? Math.max(...valori) : 1;
+    const totPeriodo = valori.reduce((s, v) => s + v, 0);
+    const giorniAttivi = valori.filter(v => v > 0).length;
+    
     const mesiLabel = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
     const giorniLabel = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
     
-    // Riepilogo in alto
     let summaryHtml = `
         <div class="heatmap-summary">
             <div class="heatmap-summary-item">
@@ -95,13 +130,12 @@ function renderHeatmap(heatmap, giorni) {
         </div>
     `;
     
-    // Griglia heatmap
     let html = '<div class="heatmap-scroll">';
     html += '<div class="heatmap-grid">';
     
-    // Colonna etichette giorni (a sinistra)
+    // Etichette giorni
     html += '<div class="heatmap-day-labels">';
-    html += '<div class="heatmap-day-label header"></div>'; // spazio per riga mesi
+    html += '<div class="heatmap-day-label header"></div>';
     giorniLabel.forEach(g => {
         html += `<div class="heatmap-day-label">${g}</div>`;
     });
@@ -111,16 +145,15 @@ function renderHeatmap(heatmap, giorni) {
     html += '<div class="heatmap-weeks">';
     let ultimoMese = -1;
     let ultimaSettimanaMese = '';
+    
     settimane.forEach((settimana) => {
         const primoGiorno = settimana[0].dataObj;
         const mese = primoGiorno.getMonth();
         const annoCorrente = primoGiorno.getFullYear();
         let mostraMese = '';
         
-        // Mostra il nome del mese quando cambia (evitando ripetizioni troppo vicine)
         const keyMese = `${annoCorrente}-${mese}`;
         if (keyMese !== ultimaSettimanaMese && mese !== ultimoMese) {
-            // Verifica che non ci sia già un'etichetta troppo vicina
             const giorniDallInizioMese = primoGiorno.getDate();
             if (giorniDallInizioMese <= 7 || mese !== ultimoMese) {
                 mostraMese = mesiLabel[mese];
@@ -134,11 +167,11 @@ function renderHeatmap(heatmap, giorni) {
         html += `<div class="heatmap-month-label">${mostraMese}</div>`;
         settimana.forEach(giorno => {
             const livello = giorno.futuro ? 'futuro' : getHeatLevel(giorno.quantita, maxConsumo);
-            const dataIt = giorno.dataObj.toLocaleDateString('it-IT', { 
-                weekday: 'short', day: 'numeric', month: 'short' 
+            const dataIt = giorno.dataObj.toLocaleDateString('it-IT', {
+                weekday: 'short', day: 'numeric', month: 'short'
             });
-            const titolo = giorno.futuro 
-                ? '' 
+            const titolo = giorno.futuro
+                ? ''
                 : `${dataIt}: ${giorno.quantita} capsule`;
             html += `<div class="heatmap-cell level-${livello}" title="${titolo}" data-qty="${giorno.quantita}" data-date="${giorno.data}"></div>`;
         });
@@ -163,15 +196,6 @@ function renderHeatmap(heatmap, giorni) {
     `;
     
     container.innerHTML = summaryHtml + html + legendHtml;
-}
-
-function getHeatLevel(quantita, max) {
-    if (quantita === 0) return 0;
-    const ratio = quantita / max;
-    if (ratio <= 0.25) return 1;
-    if (ratio <= 0.5) return 2;
-    if (ratio <= 0.75) return 3;
-    return 4;
 }
 
 function renderTopCaffe(topCaffe) {
@@ -247,7 +271,6 @@ function renderPerCategoria(perCategoria) {
     const totale = entries.reduce((s, [, v]) => s + v, 0);
     const colori = ['#6f4e37', '#c9a227', '#a67c52', '#4a7c59', '#7a3b8f', '#2c5f8a'];
     
-    // Barra stacked
     let stackedHtml = '<div class="stacked-bar">';
     entries.forEach(([, v], i) => {
         const perc = (v / totale) * 100;
@@ -255,7 +278,6 @@ function renderPerCategoria(perCategoria) {
     });
     stackedHtml += '</div>';
     
-    // Legenda
     let legendHtml = '<div class="legend-list">';
     entries.forEach(([k, v], i) => {
         const perc = ((v / totale) * 100).toFixed(1);
@@ -270,41 +292,6 @@ function renderPerCategoria(perCategoria) {
     legendHtml += '</div>';
     
     container.innerHTML = stackedHtml + legendHtml;
-}
-
-function renderPerMagazzino(perMagazzino) {
-    const container = document.getElementById('per-magazzino-container');
-    if (!container) return;
-    
-    const totale = (perMagazzino.Ufficio || 0) + (perMagazzino.Casa || 0);
-    if (totale === 0) {
-        container.innerHTML = '<div class="empty-chart"><i class="ri-inbox-line"></i> Nessun dato</div>';
-        return;
-    }
-    
-    const uffPerc = ((perMagazzino.Ufficio / totale) * 100).toFixed(1);
-    const casaPerc = ((perMagazzino.Casa / totale) * 100).toFixed(1);
-    
-    container.innerHTML = `
-        <div class="magazzino-stat">
-            <div class="magazzino-stat-header">
-                <span><i class="ri-building-line"></i> Ufficio</span>
-                <span><strong>${perMagazzino.Ufficio}</strong> (${uffPerc}%)</span>
-            </div>
-            <div class="bar-track" style="height:10px;">
-                <div class="bar-fill" style="width:${uffPerc}%;background:#6f4e37;"></div>
-            </div>
-        </div>
-        <div class="magazzino-stat" style="margin-top:1rem;">
-            <div class="magazzino-stat-header">
-                <span><i class="ri-home-line"></i> Casa</span>
-                <span><strong>${perMagazzino.Casa}</strong> (${casaPerc}%)</span>
-            </div>
-            <div class="bar-track" style="height:10px;">
-                <div class="bar-fill" style="width:${casaPerc}%;background:#a67c52;"></div>
-            </div>
-        </div>
-    `;
 }
 
 // --- Inizializzazione pulsanti periodo ---

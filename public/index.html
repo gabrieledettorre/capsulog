@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Capsulog - Gestione Inventario Caffè</title>
+    <link rel="icon" type="image/svg+xml" href="/capsulog.svg">
     <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
@@ -98,6 +99,25 @@
                 <span><i class="ri-building-line"></i> Ufficio: <strong id="manage-count-ufficio">0</strong></span>
                 <span><i class="ri-home-line"></i> Casa: <strong id="manage-count-casa">0</strong></span>
             </div>
+
+            <div class="sorting-bar">
+                <div class="search-box">
+                    <i class="ri-search-line"></i>
+                    <input type="text" id="manage-search" placeholder="Cerca per nome, marca, gusto, note...">
+                </div>
+                <div class="sort-group">
+                    <button class="manage-sort-btn" data-sort="nome">
+                        <span class="sort-icon"><i class="ri-sort-alphabet-asc"></i></span> Nome
+                    </button>
+                    <button class="manage-sort-btn" data-sort="totale">
+                        <span class="sort-icon"><i class="ri-sort-number-desc"></i></span> Totale
+                    </button>
+                    <button class="manage-sort-btn" data-sort="categoria">
+                        <span class="sort-icon"><i class="ri-layout-grid-line"></i></span> Categoria
+                    </button>
+                </div>
+            </div>
+
             <div id="manage-list"></div>
         </div>
 
@@ -116,9 +136,9 @@
             <div class="stats-overview" id="stats-overview"></div>
 
             <div class="chart-card">
-    <h3><i class="ri-calendar-line"></i> Attività ultimi mesi</h3>
-    <div id="heatmap-container" class="heatmap-container"></div>
-</div>
+                <h3><i class="ri-calendar-line"></i> Attività ultimi mesi</h3>
+                <div id="heatmap-container" class="heatmap-container"></div>
+            </div>
 
             <div class="chart-grid">
                 <div class="chart-card">
@@ -132,16 +152,9 @@
                 </div>
             </div>
 
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <h3><i class="ri-pie-chart-line"></i> Per categoria</h3>
-                    <div id="per-categoria-container"></div>
-                </div>
-
-                <div class="chart-card">
-                    <h3><i class="ri-store-2-line"></i> Per magazzino</h3>
-                    <div id="per-magazzino-container"></div>
-                </div>
+            <div class="chart-card">
+                <h3><i class="ri-pie-chart-line"></i> Per categoria</h3>
+                <div id="per-categoria-container"></div>
             </div>
         </div>
 
