@@ -7,6 +7,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         document.getElementById(`${page}-page`).classList.add('active');
         if (page === 'dashboard') loadDashboard();
         if (page === 'manage') loadManageList();
+        if (page === 'stats') loadStats();
     });
 });
 

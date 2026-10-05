@@ -1,2 +1,7 @@
-node_modules
-data
+node_modules/
+data/
+log.json
+log.json.migrato
+*.db
+*.db-shm
+*.db-wal
