@@ -8,8 +8,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database in memoria
-// Ogni voce rappresenta una "capsula in un magazzino".
-// Il catalogo (nome, marca, gusto, categoria, colore, note) è condiviso per nome.
 let dbCaffe = [
     { id: 1, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Ufficio', quantita: 12, colore: '#6f4e37', note: 'Intensità 8/12' },
     { id: 2, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Casa', quantita: 4, colore: '#6f4e37', note: 'Intensità 8/12' },
@@ -41,7 +39,7 @@ app.post('/api/caffe', (req, res) => {
         marca: marca ? marca.trim() : null,
         gusto: gusto ? gusto.trim() : null,
         categoria: categoria || 'Caffè',
-        magazzino: magazzino || 'Ufficio',
+        magazzino: magazzino || 'Casa',
         quantita: parseInt(quantita) || 0,
         colore: colore || '#6f4e37',
         note: note ? note.trim() : null
@@ -86,7 +84,7 @@ app.post('/api/caffe/aggiungi-a-magazzino', (req, res) => {
     res.status(201).json(nuovaVoce);
 });
 
-// PUT - Aggiorna caffè (aggiorna anche le voci "gemelle" negli altri magazzini per coerenza catalogo)
+// PUT - Aggiorna caffè (propaga catalogo agli altri magazzini)
 app.put('/api/caffe/:id', (req, res) => {
     const id = parseInt(req.params.id);
     const idx = dbCaffe.findIndex(c => c.id === id);
@@ -109,7 +107,7 @@ app.put('/api/caffe/:id', (req, res) => {
 
     dbCaffe[idx] = aggiornato;
 
-    // Propaga le modifiche di catalogo (non quantità/magazzino) alle altre voci con lo stesso nome
+    // Propaga modifiche catalogo (non quantità/magazzino) alle voci con lo stesso nome
     if (vecchioNome && aggiornato.nome) {
         dbCaffe.forEach((c, i) => {
             if (i !== idx && c.nome.toLowerCase() === vecchioNome.toLowerCase()) {
@@ -159,6 +157,9 @@ app.post('/api/caffe/trasferisci', (req, res) => {
     if (!nome || !daMagazzino || !aMagazzino || !qty || qty <= 0) {
         return res.status(400).json({ error: 'Dati di trasferimento non validi' });
     }
+    if (daMagazzino === aMagazzino) {
+        return res.status(400).json({ error: 'I magazzini devono essere diversi' });
+    }
 
     const sorgente = dbCaffe.find(c => c.nome.toLowerCase() === nome.toLowerCase() && c.magazzino === daMagazzino);
     if (!sorgente || sorgente.quantita < qty) {
@@ -188,11 +189,19 @@ app.post('/api/caffe/trasferisci', (req, res) => {
     res.json({ message: `Trasferite ${qty} capsule da ${daMagazzino} a ${aMagazzino}` });
 });
 
-// DELETE - Elimina una voce (singolo magazzino)
+// DELETE - Elimina una singola voce (singolo magazzino)
 app.delete('/api/caffe/:id', (req, res) => {
     const id = parseInt(req.params.id);
     dbCaffe = dbCaffe.filter(c => c.id !== id);
     res.json({ success: true });
+});
+
+// DELETE - Elimina caffè da TUTTO il catalogo (tutti i magazzini) per nome
+app.delete('/api/caffe/catalogo/:nome', (req, res) => {
+    const nome = decodeURIComponent(req.params.nome).toLowerCase();
+    const prima = dbCaffe.length;
+    dbCaffe = dbCaffe.filter(c => c.nome.toLowerCase() !== nome);
+    res.json({ success: true, rimosse: prima - dbCaffe.length });
 });
 
 app.listen(PORT, () => {

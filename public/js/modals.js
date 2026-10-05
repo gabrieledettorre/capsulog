@@ -8,6 +8,7 @@ const colorInput = document.getElementById('colore');
 const hexInput = document.getElementById('colore-hex');
 
 function setColor(value) {
+    if (!value) value = '#6f4e37';
     colorInput.value = value;
     hexInput.value = value;
 }
@@ -19,9 +20,7 @@ colorInput?.addEventListener('input', () => {
 hexInput?.addEventListener('input', () => {
     let v = hexInput.value.trim();
     if (!v.startsWith('#')) v = '#' + v;
-    // Accetta solo hex validi (3 o 6 cifre)
     if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
-        // Normalizza a 6 cifre se è a 3
         if (v.length === 4) {
             v = '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
         }
@@ -30,7 +29,6 @@ hexInput?.addEventListener('input', () => {
 });
 
 hexInput?.addEventListener('blur', () => {
-    // Al blur, se non valido, ripristina dal color picker
     let v = hexInput.value.trim();
     if (!v.startsWith('#')) v = '#' + v;
     if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
@@ -42,14 +40,6 @@ hexInput?.addEventListener('blur', () => {
         hexInput.value = v.toLowerCase();
         colorInput.value = v.toLowerCase();
     }
-});
-
-// --- Preset colori ---
-document.querySelectorAll('.color-preset').forEach(btn => {
-    btn.style.background = btn.dataset.color;
-    btn.addEventListener('click', () => {
-        setColor(btn.dataset.color);
-    });
 });
 
 function openModal(isEdit = false) {
@@ -71,7 +61,7 @@ function resetForm() {
     document.getElementById('marca').value = '';
     document.getElementById('gusto').value = '';
     document.getElementById('categoria').value = 'Caffè';
-    document.getElementById('magazzino').value = currentMagazzino || 'Ufficio';
+    document.getElementById('magazzino').value = 'Casa';
     document.getElementById('quantita').value = 0;
     setColor('#6f4e37');
     document.getElementById('note').value = '';
@@ -89,10 +79,10 @@ function closeRefillModal() {
 }
 
 // --- Modal "Aggiungi a magazzino" ---
-function openAddWarehouseModal(nome) {
+function openAddWarehouseModal(nome, magazzinoDefault) {
     document.getElementById('add-warehouse-nome').textContent = nome;
     document.getElementById('add-warehouse-nome-hidden').value = nome;
-    document.getElementById('add-warehouse-magazzino').value = currentMagazzino === 'Ufficio' ? 'Casa' : 'Ufficio';
+    document.getElementById('add-warehouse-magazzino').value = magazzinoDefault || 'Ufficio';
     document.getElementById('add-warehouse-quantita').value = 0;
     addWarehouseModal.classList.add('active');
 }

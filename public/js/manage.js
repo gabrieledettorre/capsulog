@@ -40,6 +40,11 @@ async function loadManageList() {
         const colore = dettagli.colore || '#6f4e37';
         const uff = item.ufficio;
         const casa = item.casa;
+        const nomeEscaped = escapeHtml(nome).replace(/'/g, "\\'");
+        
+        // Quantità visualizzate (0 se assente)
+        const uffQty = uff ? uff.quantita : 0;
+        const casaQty = casa ? casa.quantita : 0;
         
         return `
         <div class="manage-item" style="--capsule-color: ${colore};">
@@ -55,29 +60,39 @@ async function loadManageList() {
                 </div>
                 ${dettagli.note ? `<span style="color:var(--text-secondary);font-size:0.7rem;font-style:italic;"><i class="ri-sticky-note-line"></i> ${escapeHtml(dettagli.note)}</span>` : ''}
                 <div class="manage-badges">
-                    ${uff 
-                        ? `<span class="magazzino-badge present"><i class="ri-building-line"></i> Ufficio <span class="qty">${uff.quantita}</span></span>` 
-                        : `<span class="magazzino-badge"><i class="ri-building-line"></i> Ufficio —</span>`}
-                    ${casa 
-                        ? `<span class="magazzino-badge present"><i class="ri-home-line"></i> Casa <span class="qty">${casa.quantita}</span></span>` 
-                        : `<span class="magazzino-badge"><i class="ri-home-line"></i> Casa —</span>`}
+                    <span class="magazzino-badge ${casaQty > 0 ? 'present' : ''}">
+                        <i class="ri-home-line"></i> Casa <span class="qty">${casaQty}</span>
+                    </span>
+                    <span class="magazzino-badge ${uffQty > 0 ? 'present' : ''}">
+                        <i class="ri-building-line"></i> Ufficio <span class="qty">${uffQty}</span>
+                    </span>
                 </div>
             </div>
             <div class="manage-actions">
-                ${uff 
-                    ? `<button onclick="window.editCaffe(${uff.id})" class="btn-icon" title="Modifica"><i class="ri-edit-line"></i></button>`
-                    : `<button onclick="window.editCaffe(${casa.id})" class="btn-icon" title="Modifica"><i class="ri-edit-line"></i></button>`}
-                ${uff 
-                    ? `<button onclick="window.settaQuantita(${uff.id})" class="btn-icon" title="Q.tà Ufficio"><i class="ri-building-line"></i></button>` 
-                    : `<button onclick="window.openAddWarehouseModal('${escapeHtml(nome).replace(/'/g, "\\'")}')" class="btn-icon" title="Aggiungi a Ufficio"><i class="ri-add-line"></i> <i class="ri-building-line"></i></button>`}
+                <!-- Modifica catalogo -->
+                <button onclick="window.editCaffe(${uff?.id || casa?.id})" class="btn-icon" title="Modifica catalogo">
+                    <i class="ri-edit-line"></i>
+                </button>
+                
+                <!-- Aggiungi/Imposta Casa -->
                 ${casa 
-                    ? `<button onclick="window.settaQuantita(${casa.id})" class="btn-icon" title="Q.tà Casa"><i class="ri-home-line"></i></button>` 
-                    : `<button onclick="window.openAddWarehouseModal('${escapeHtml(nome).replace(/'/g, "\\'")}')" class="btn-icon" title="Aggiungi a Casa"><i class="ri-add-line"></i> <i class="ri-home-line"></i></button>`}
+                    ? `<button onclick="window.settaQuantita(${casa.id})" class="btn-icon" title="Imposta quantità Casa"><i class="ri-home-line"></i> <i class="ri-edit-line" style="font-size:0.7rem;"></i></button>`
+                    : `<button onclick="window.openAddWarehouseModal('${nomeEscaped}', 'Casa')" class="btn-icon" title="Aggiungi a Casa"><i class="ri-add-line"></i> <i class="ri-home-line"></i></button>`}
+                
+                <!-- Aggiungi/Imposta Ufficio -->
+                ${uff 
+                    ? `<button onclick="window.settaQuantita(${uff.id})" class="btn-icon" title="Imposta quantità Ufficio"><i class="ri-building-line"></i> <i class="ri-edit-line" style="font-size:0.7rem;"></i></button>`
+                    : `<button onclick="window.openAddWarehouseModal('${nomeEscaped}', 'Ufficio')" class="btn-icon" title="Aggiungi a Ufficio"><i class="ri-add-line"></i> <i class="ri-building-line"></i></button>`}
+                
+                <!-- Trasferisci (solo se entrambi esistono) -->
                 ${(uff && casa) 
-                    ? `<button onclick="window.openTrasferisciModal(${uff.id})" class="btn-icon" title="Trasferisci"><i class="ri-exchange-line"></i></button>` 
+                    ? `<button onclick="window.openTrasferisciModal(${casa.id})" class="btn-icon" title="Trasferisci"><i class="ri-exchange-line"></i></button>` 
                     : ''}
-                ${uff ? `<button onclick="window.deleteCaffe(${uff.id})" class="btn-icon" title="Rimuovi da Ufficio"><i class="ri-delete-bin-line"></i></button>` : ''}
-                ${casa ? `<button onclick="window.deleteCaffe(${casa.id})" class="btn-icon" title="Rimuovi da Casa"><i class="ri-delete-bin-line"></i></button>` : ''}
+                
+                <!-- Elimina totale dal catalogo -->
+                <button onclick="window.deleteCatalogo('${nomeEscaped}')" class="btn-icon btn-icon-danger" title="Elimina dal catalogo (tutti i magazzini)">
+                    <i class="ri-delete-bin-line"></i>
+                </button>
             </div>
         </div>
     `}).join('');
@@ -116,7 +131,7 @@ window.editCaffe = async (id) => {
     document.getElementById('marca').value = c.marca || '';
     document.getElementById('gusto').value = c.gusto || '';
     document.getElementById('categoria').value = c.categoria || 'Caffè';
-    document.getElementById('magazzino').value = c.magazzino || 'Ufficio';
+    document.getElementById('magazzino').value = c.magazzino || 'Casa';
     document.getElementById('quantita').value = c.quantita;
     setColor(c.colore || '#6f4e37');
     document.getElementById('note').value = c.note || '';
@@ -125,9 +140,19 @@ window.editCaffe = async (id) => {
     document.getElementById('coffee-modal').classList.add('active');
 };
 
+// Elimina singola voce (magazzino)
 window.deleteCaffe = async (id) => {
     if (confirm('Rimuovere questo caffè da questo magazzino?')) {
         await fetch(`/api/caffe/${id}`, { method: 'DELETE' });
+        loadDashboard();
+        loadManageList();
+    }
+};
+
+// Elimina dal catalogo (tutti i magazzini)
+window.deleteCatalogo = async (nome) => {
+    if (confirm(`Eliminare "${nome}" da TUTTO il catalogo?\n\nQuesta azione rimuoverà il caffè da tutti i magazzini.`)) {
+        await fetch(`/api/caffe/catalogo/${encodeURIComponent(nome)}`, { method: 'DELETE' });
         loadDashboard();
         loadManageList();
     }

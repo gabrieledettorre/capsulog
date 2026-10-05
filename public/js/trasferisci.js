@@ -7,7 +7,8 @@ function openTrasferisciModal(id) {
             document.getElementById('trasferisci-id').value = data.id;
             document.getElementById('trasferisci-nome').value = data.nome;
             document.getElementById('trasferisci-da').value = data.magazzino;
-            document.getElementById('trasferisci-a').value = data.magazzino === 'Ufficio' ? 'Casa' : 'Ufficio';
+            // Default: se sono in Casa → Ufficio (flusso naturale), altrimenti Ufficio → Casa
+            document.getElementById('trasferisci-a').value = data.magazzino === 'Casa' ? 'Ufficio' : 'Casa';
             document.getElementById('trasferisci-quantita').value = 1;
             trasferisciModal.classList.add('active');
         });
@@ -25,6 +26,10 @@ document.getElementById('trasferisci-confirm')?.addEventListener('click', async 
     
     if (quantita <= 0) {
         alert('Inserisci una quantità valida');
+        return;
+    }
+    if (daMagazzino === aMagazzino) {
+        alert('I magazzini devono essere diversi');
         return;
     }
     
