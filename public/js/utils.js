@@ -1,6 +1,6 @@
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>"']/g, (m) => {
+    return String(str).replace(/[&<>"']/g, (m) => {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
         return map[m];
     });

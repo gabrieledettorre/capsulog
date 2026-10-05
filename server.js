@@ -8,10 +8,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database in memoria
+// Ogni voce rappresenta una "capsula in un magazzino".
+// Il catalogo (nome, marca, gusto, categoria, colore, note) è condiviso per nome.
 let dbCaffe = [
-    { id: 1, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Ufficio', quantita: 12 },
-    { id: 2, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Casa', quantita: 4 },
-    { id: 3, nome: 'Ginseng', marca: 'Nescafé', gusto: 'Dolce', categoria: 'Bevande Calde', magazzino: 'Ufficio', quantita: 2 }
+    { id: 1, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Ufficio', quantita: 12, colore: '#6f4e37', note: 'Intensità 8/12' },
+    { id: 2, nome: 'Espresso Bar', marca: 'Lavazza', gusto: 'Intenso', categoria: 'Caffè', magazzino: 'Casa', quantita: 4, colore: '#6f4e37', note: 'Intensità 8/12' },
+    { id: 3, nome: 'Ginseng', marca: 'Nescafé', gusto: 'Dolce', categoria: 'Bevande Calde', magazzino: 'Ufficio', quantita: 2, colore: '#c9a227', note: 'Delicato' }
 ];
 
 let nextId = 4;
@@ -28,9 +30,9 @@ app.get('/api/caffe/:id', (req, res) => {
     res.json(caffe);
 });
 
-// POST - Crea nuovo caffè
+// POST - Crea nuovo caffè (in un magazzino specifico)
 app.post('/api/caffe', (req, res) => {
-    const { nome, marca, gusto, categoria, magazzino, quantita } = req.body;
+    const { nome, marca, gusto, categoria, magazzino, quantita, colore, note } = req.body;
     if (!nome) return res.status(400).json({ error: 'Il nome è obbligatorio' });
 
     const nuovoCaffe = {
@@ -40,31 +42,88 @@ app.post('/api/caffe', (req, res) => {
         gusto: gusto ? gusto.trim() : null,
         categoria: categoria || 'Caffè',
         magazzino: magazzino || 'Ufficio',
-        quantita: parseInt(quantita) || 0
+        quantita: parseInt(quantita) || 0,
+        colore: colore || '#6f4e37',
+        note: note ? note.trim() : null
     };
 
     dbCaffe.push(nuovoCaffe);
     res.status(201).json(nuovoCaffe);
 });
 
-// PUT - Aggiorna caffè
+// POST - Aggiunge un caffè esistente (per nome) a un altro magazzino
+app.post('/api/caffe/aggiungi-a-magazzino', (req, res) => {
+    const { nome, magazzino, quantita } = req.body;
+    if (!nome || !magazzino) {
+        return res.status(400).json({ error: 'Nome e magazzino sono obbligatori' });
+    }
+
+    const esistente = dbCaffe.find(c => c.nome.toLowerCase() === nome.toLowerCase());
+    if (!esistente) {
+        return res.status(404).json({ error: 'Caffè non trovato nel catalogo' });
+    }
+
+    const giàPresente = dbCaffe.find(
+        c => c.nome.toLowerCase() === nome.toLowerCase() && c.magazzino === magazzino
+    );
+    if (giàPresente) {
+        return res.status(400).json({ error: 'Questo caffè è già presente in questo magazzino' });
+    }
+
+    const nuovaVoce = {
+        id: nextId++,
+        nome: esistente.nome,
+        marca: esistente.marca,
+        gusto: esistente.gusto,
+        categoria: esistente.categoria,
+        colore: esistente.colore,
+        note: esistente.note,
+        magazzino,
+        quantita: parseInt(quantita) || 0
+    };
+
+    dbCaffe.push(nuovaVoce);
+    res.status(201).json(nuovaVoce);
+});
+
+// PUT - Aggiorna caffè (aggiorna anche le voci "gemelle" negli altri magazzini per coerenza catalogo)
 app.put('/api/caffe/:id', (req, res) => {
     const id = parseInt(req.params.id);
     const idx = dbCaffe.findIndex(c => c.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Caffè non trovato' });
 
-    const { nome, marca, gusto, categoria, magazzino, quantita } = req.body;
-    dbCaffe[idx] = {
+    const { nome, marca, gusto, categoria, magazzino, quantita, colore, note } = req.body;
+    const vecchioNome = dbCaffe[idx].nome;
+
+    const aggiornato = {
         ...dbCaffe[idx],
         nome: nome ? nome.trim() : dbCaffe[idx].nome,
         marca: marca !== undefined ? (marca ? marca.trim() : null) : dbCaffe[idx].marca,
         gusto: gusto !== undefined ? (gusto ? gusto.trim() : null) : dbCaffe[idx].gusto,
         categoria: categoria || dbCaffe[idx].categoria,
         magazzino: magazzino || dbCaffe[idx].magazzino,
-        quantita: quantita !== undefined ? parseInt(quantita) : dbCaffe[idx].quantita
+        quantita: quantita !== undefined ? parseInt(quantita) : dbCaffe[idx].quantita,
+        colore: colore !== undefined ? colore : dbCaffe[idx].colore,
+        note: note !== undefined ? (note ? note.trim() : null) : dbCaffe[idx].note
     };
 
-    res.json(dbCaffe[idx]);
+    dbCaffe[idx] = aggiornato;
+
+    // Propaga le modifiche di catalogo (non quantità/magazzino) alle altre voci con lo stesso nome
+    if (vecchioNome && aggiornato.nome) {
+        dbCaffe.forEach((c, i) => {
+            if (i !== idx && c.nome.toLowerCase() === vecchioNome.toLowerCase()) {
+                c.nome = aggiornato.nome;
+                c.marca = aggiornato.marca;
+                c.gusto = aggiornato.gusto;
+                c.categoria = aggiornato.categoria;
+                c.colore = aggiornato.colore;
+                c.note = aggiornato.note;
+            }
+        });
+    }
+
+    res.json(aggiornato);
 });
 
 // PATCH - Consuma 1 capsula
@@ -119,7 +178,9 @@ app.post('/api/caffe/trasferisci', (req, res) => {
             gusto: sorgente.gusto,
             categoria: sorgente.categoria,
             magazzino: aMagazzino,
-            quantita: qty
+            quantita: qty,
+            colore: sorgente.colore,
+            note: sorgente.note
         };
         dbCaffe.push(destinazione);
     }
@@ -127,7 +188,7 @@ app.post('/api/caffe/trasferisci', (req, res) => {
     res.json({ message: `Trasferite ${qty} capsule da ${daMagazzino} a ${aMagazzino}` });
 });
 
-// DELETE - Elimina caffè
+// DELETE - Elimina una voce (singolo magazzino)
 app.delete('/api/caffe/:id', (req, res) => {
     const id = parseInt(req.params.id);
     dbCaffe = dbCaffe.filter(c => c.id !== id);

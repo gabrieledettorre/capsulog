@@ -105,19 +105,24 @@ async function loadDashboard() {
     container.innerHTML = filtered.map(c => {
         const isLowStock = c.quantita > 0 && c.quantita <= lowStockThreshold;
         const categoriaIcon = c.categoria === 'Caffè' ? 'ri-cup-line' : 'ri-tea-line';
+        const colore = c.colore || '#6f4e37';
         
         return `
-        <div class="coffee-card">
+        <div class="coffee-card" style="--capsule-color: ${colore};">
             <div class="coffee-header">
                 <div>
-                    <div class="coffee-name">${escapeHtml(c.nome)}</div>
+                    <div class="coffee-name">
+                        <span class="coffee-color-dot" style="background:${colore};"></span>
+                        ${escapeHtml(c.nome)}
+                    </div>
                     ${c.marca ? `<div class="coffee-marca">${escapeHtml(c.marca)}</div>` : ''}
                     <div class="coffee-categoria"><i class="${categoriaIcon}"></i> ${escapeHtml(c.categoria)}</div>
                 </div>
                 <div class="quantity-badge">${c.quantita}</div>
             </div>
             <div class="coffee-gusto">${c.gusto ? `<i class="ri-taste-line"></i> ${escapeHtml(c.gusto)}` : '&nbsp;'}</div>
-            ${isLowStock ? '<div class="low-stock-warning"><i class="ri-alert-line"></i> Scorta bassa</div>' : '<div style="height:20px;"></div>'}
+            ${c.note ? `<div class="coffee-note"><i class="ri-sticky-note-line"></i> ${escapeHtml(c.note)}</div>` : ''}
+            ${isLowStock ? '<div class="low-stock-warning" style="margin-top:0.5rem;color:var(--danger);font-size:0.7rem;"><i class="ri-alert-line"></i> Scorta bassa</div>' : ''}
             <div class="coffee-actions">
                 <button onclick="window.consuma(${c.id})" class="btn-consume"><i class="ri-cup-line"></i> Consuma</button>
                 <button onclick="window.openRefillModal(${c.id})" class="btn-icon" title="Aggiungi"><i class="ri-add-line"></i></button>
