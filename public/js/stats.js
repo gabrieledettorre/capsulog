@@ -45,36 +45,155 @@ function formatLocalDate(d) {
 
 function getHeatLevel(quantita, max) {
     if (quantita === 0) return 0;
-    
-    // Scala mista basata su valori assoluti quando i numeri sono piccoli
-    // Altrimenti proporzionale al massimo
-    
-    // Caso max molto piccolo (uso personale, 1-2 caffè al giorno)
-    if (max <= 2) {
-        return quantita >= max ? 4 : 2;
-    }
-    
-    if (max <= 5) {
-        if (quantita === 1) return 1;
-        if (quantita === 2) return 2;
-        if (quantita === 3) return 3;
-        return 4;
-    }
-    
-    // max grande: scala proporzionale
-    const ratio = quantita / max;
-    if (ratio <= 0.25) return 1;
-    if (ratio <= 0.5) return 2;
-    if (ratio <= 0.75) return 3;
-    return 4;
-}
-
-function getHeatLevel(quantita, max) {
-    if (quantita === 0) return 0;
     if (quantita === 1) return 1;
     if (quantita === 2) return 2;
     if (quantita === 3) return 3;
     return 4;
+}
+
+function renderHeatmap(heatmap, giorni) {
+    const container = document.getElementById('heatmap-container');
+    if (!container) return;
+    
+    const numGiorni = Math.max(84, giorni);
+    
+    // Normalizza le chiavi heatmap: estrai solo YYYY-MM-DD
+    const heatmapNorm = {};
+    Object.keys(heatmap || {}).forEach(k => {
+        const key = String(k).substring(0, 10);
+        heatmapNorm[key] = (heatmapNorm[key] || 0) + (heatmap[k] || 0);
+    });
+    
+    // OGGI in formato YYYY-MM-DD locale
+    const oggi = new Date();
+    const oggiStr = formatLocalDate(oggi);
+    
+    // Data di inizio: numGiorni fa
+    const inizioData = new Date(oggi);
+    inizioData.setDate(inizioData.getDate() - numGiorni + 1);
+    
+    // Arretra al lunedì della settimana
+    const dow = (inizioData.getDay() + 6) % 7; // 0 = lunedì
+    inizioData.setDate(inizioData.getDate() - dow);
+    
+    // Costruisci settimane
+    const settimane = [];
+    const corrente = new Date(inizioData);
+    
+    while (formatLocalDate(corrente) <= oggiStr) {
+        const settimana = [];
+        for (let d = 0; d < 7; d++) {
+            const dataStr = formatLocalDate(corrente);
+            const dataObj = new Date(corrente);
+            const futuro = dataStr > oggiStr;
+            settimana.push({
+                data: dataStr,
+                dataObj,
+                futuro,
+                quantita: futuro ? 0 : (heatmapNorm[dataStr] || 0)
+            });
+            corrente.setDate(corrente.getDate() + 1);
+        }
+        settimane.push(settimana);
+    }
+    
+    // Debug
+    console.log('[HEATMAP] oggi:', oggiStr);
+    console.log('[HEATMAP] settimane:', settimane.length);
+    console.log('[HEATMAP] chiavi:', Object.keys(heatmapNorm));
+    
+    // Statistiche
+    const valori = Object.values(heatmapNorm);
+    const maxConsumo = valori.length > 0 ? Math.max(...valori) : 1;
+    const totPeriodo = valori.reduce((s, v) => s + v, 0);
+    const giorniAttivi = valori.filter(v => v > 0).length;
+    
+    const mesiLabel = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+    const giorniLabel = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+    
+    let summaryHtml = `
+        <div class="heatmap-summary">
+            <div class="heatmap-summary-item">
+                <span class="heatmap-summary-value">${totPeriodo}</span>
+                <span class="heatmap-summary-label">capsule totali</span>
+            </div>
+            <div class="heatmap-summary-item">
+                <span class="heatmap-summary-value">${giorniAttivi}</span>
+                <span class="heatmap-summary-label">giorni attivi</span>
+            </div>
+            <div class="heatmap-summary-item">
+                <span class="heatmap-summary-value">${maxConsumo}</span>
+                <span class="heatmap-summary-label">record giornaliero</span>
+            </div>
+        </div>
+    `;
+    
+    let html = '<div class="heatmap-scroll">';
+    html += '<div class="heatmap-grid">';
+    
+    // Etichette giorni
+    html += '<div class="heatmap-day-labels">';
+    html += '<div class="heatmap-day-label header"></div>';
+    giorniLabel.forEach(g => {
+        html += `<div class="heatmap-day-label">${g}</div>`;
+    });
+    html += '</div>';
+    
+    // Settimane
+    html += '<div class="heatmap-weeks">';
+    let ultimoMese = -1;
+    let ultimaSettimanaMese = '';
+    
+    settimane.forEach((settimana) => {
+        const primoGiorno = settimana[0].dataObj;
+        const mese = primoGiorno.getMonth();
+        const annoCorrente = primoGiorno.getFullYear();
+        let mostraMese = '';
+        
+        const keyMese = `${annoCorrente}-${mese}`;
+        if (keyMese !== ultimaSettimanaMese && mese !== ultimoMese) {
+            const giorniDallInizioMese = primoGiorno.getDate();
+            if (giorniDallInizioMese <= 7 || mese !== ultimoMese) {
+                mostraMese = mesiLabel[mese];
+                if (mese === 0) mostraMese += ` ${annoCorrente}`;
+                ultimoMese = mese;
+                ultimaSettimanaMese = keyMese;
+            }
+        }
+        
+        html += '<div class="heatmap-week">';
+        html += `<div class="heatmap-month-label">${mostraMese}</div>`;
+        settimana.forEach(giorno => {
+            const livello = giorno.futuro ? 'futuro' : getHeatLevel(giorno.quantita, maxConsumo);
+            const dataIt = giorno.dataObj.toLocaleDateString('it-IT', {
+                weekday: 'short', day: 'numeric', month: 'short'
+            });
+            const titolo = giorno.futuro
+                ? ''
+                : `${dataIt}: ${giorno.quantita} capsule`;
+            html += `<div class="heatmap-cell level-${livello}" title="${titolo}" data-qty="${giorno.quantita}" data-date="${giorno.data}"></div>`;
+        });
+        html += '</div>';
+    });
+    html += '</div></div></div>';
+    
+    // Legenda
+    let legendHtml = `
+        <div class="heatmap-legend">
+            <span class="heatmap-legend-label">Meno</span>
+            <div class="heatmap-legend-scale">
+                <span class="heatmap-cell level-0"></span>
+                <span class="heatmap-cell level-1"></span>
+                <span class="heatmap-cell level-2"></span>
+                <span class="heatmap-cell level-3"></span>
+                <span class="heatmap-cell level-4"></span>
+            </div>
+            <span class="heatmap-legend-label">Più</span>
+            <span class="heatmap-legend-range">(0 → ${maxConsumo})</span>
+        </div>
+    `;
+    
+    container.innerHTML = summaryHtml + html + legendHtml;
 }
 
 function renderTopCaffe(topCaffe) {

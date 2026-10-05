@@ -799,8 +799,8 @@ input, select {
 
 /* ===== DARK THEME (default) ===== */
 .heatmap-cell.level-0 { 
-    background: #26150c;
-    border-color: #3d2618;
+    background: #3d2618;
+    border-color: #4a3020;
 }
 .heatmap-cell.level-1 { 
     background: #4a2f1f;
@@ -828,8 +828,8 @@ input, select {
 
 /* ===== LIGHT THEME ===== */
 [data-theme="light"] .heatmap-cell.level-0 { 
-    background: #f5e6ca;
-    border-color: #e8dcc8;
+    background: #faf3e3;
+    border-color: #ede0c8;
 }
 [data-theme="light"] .heatmap-cell.level-1 { 
     background: #e8d4b0;
