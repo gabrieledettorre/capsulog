@@ -7,5 +7,5 @@ services:
     ports:
       - "4316:3000"
     volumes:
-      - ./data:/app/data
+      - /mnt/pve/ssd-sata/docker/capsulog/data:/app/data
     restart: unless-stopped
