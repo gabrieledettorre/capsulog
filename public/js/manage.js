@@ -91,6 +91,7 @@ async function loadManageList() {
     container.innerHTML = items.map(item => {
         const dettagli = item.dettagli;
         const colore = dettagli.colore || '#6f4e37';
+        const textColor = '#ffffff';
         const uff = item.ufficio;
         const casa = item.casa;
         const nomeEscaped = escapeHtml(item.nome).replace(/'/g, "\\'");
@@ -99,12 +100,13 @@ async function loadManageList() {
         const casaQty = casa ? casa.quantita : 0;
         
         return `
-        <div class="manage-item" style="--capsule-color: ${colore};">
+        <div class="manage-item">
             <div class="manage-item-info">
-                <span style="font-weight:600;display:flex;align-items:center;">
-                    <span class="coffee-color-dot" style="background:${colore};"></span>
-                    ${escapeHtml(item.nome)}
-                </span>
+                <div>
+                    <span class="coffee-name-pill" style="background:${colore};color:${textColor};">
+                        ${escapeHtml(item.nome)}
+                    </span>
+                </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;font-size:0.75rem;">
                     ${dettagli.marca ? `<span style="color:var(--accent);"><i class="ri-store-line"></i> ${escapeHtml(dettagli.marca)}</span>` : ''}
                     <span style="color:var(--text-secondary);"><i class="ri-taste-line"></i> ${escapeHtml(dettagli.gusto) || '—'}</span>

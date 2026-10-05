@@ -1,3 +1,21 @@
+// Calcola se il colore è scuro (ritorna true) o chiaro (false)
+function isColorDark(hex) {
+    if (!hex) return true;
+    let c = hex.replace('#', '');
+    if (c.length === 3) {
+        c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+    }
+    if (c.length !== 6) return true;
+    
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    
+    // Formula luminanza percepita (W3C)
+    const luminanza = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminanza < 0.55;
+}
+
 function updateSortUI() {
     document.querySelectorAll('.sort-btn[data-sort]').forEach(btn => {
         const field = btn.dataset.sort;
@@ -77,13 +95,23 @@ async function loadDashboard() {
         filtered = filtered.filter(c => c.categoria === currentFilter);
     }
     
+    // Sort robusto: gestisce null/undefined e tipi misti
     filtered.sort((a, b) => {
-        let aVal = a[currentSort.field] || '';
-        let bVal = b[currentSort.field] || '';
-        if (typeof aVal === 'string') {
-            return currentSort.order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        let aVal = a[currentSort.field];
+        let bVal = b[currentSort.field];
+        
+        if (aVal === null || aVal === undefined) aVal = '';
+        if (bVal === null || bVal === undefined) bVal = '';
+        
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return currentSort.order === 'asc' ? aVal - bVal : bVal - aVal;
         }
-        return currentSort.order === 'asc' ? aVal - bVal : bVal - aVal;
+        
+        const aStr = String(aVal);
+        const bStr = String(bVal);
+        return currentSort.order === 'asc' 
+            ? aStr.localeCompare(bStr) 
+            : bStr.localeCompare(aStr);
     });
     
     const totalTypes = filtered.length;
@@ -106,13 +134,13 @@ async function loadDashboard() {
         const isLowStock = c.quantita > 0 && c.quantita <= lowStockThreshold;
         const categoriaIcon = c.categoria === 'Caffè' ? 'ri-cup-line' : 'ri-tea-line';
         const colore = c.colore || '#6f4e37';
+        const textColor = '#ffffff';
         
         return `
-        <div class="coffee-card" style="--capsule-color: ${colore};">
+        <div class="coffee-card">
             <div class="coffee-header">
-                <div>
-                    <div class="coffee-name">
-                        <span class="coffee-color-dot" style="background:${colore};"></span>
+                <div style="flex:1;min-width:0;">
+                    <div class="coffee-name-pill" style="background:${colore};color:${textColor};">
                         ${escapeHtml(c.nome)}
                     </div>
                     ${c.marca ? `<div class="coffee-marca">${escapeHtml(c.marca)}</div>` : ''}
