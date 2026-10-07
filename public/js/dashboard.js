@@ -1,4 +1,4 @@
-// Calcola se il colore è scuro (ritorna true) o chiaro (false)
+// Calcola se il colore è scuro (ritorna true) o chiaro (false) - non più usata ma lascio per sicurezza
 function isColorDark(hex) {
     if (!hex) return true;
     let c = hex.replace('#', '');
@@ -11,7 +11,6 @@ function isColorDark(hex) {
     const g = parseInt(c.substring(2, 4), 16);
     const b = parseInt(c.substring(4, 6), 16);
     
-    // Formula luminanza percepita (W3C)
     const luminanza = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return luminanza < 0.55;
 }
@@ -95,7 +94,7 @@ async function loadDashboard() {
         filtered = filtered.filter(c => c.categoria === currentFilter);
     }
     
-    // Sort robusto: gestisce null/undefined e tipi misti
+    // Sort robusto
     filtered.sort((a, b) => {
         let aVal = a[currentSort.field];
         let bVal = b[currentSort.field];
@@ -127,6 +126,7 @@ async function loadDashboard() {
     const container = document.getElementById('caffe-list');
     if (filtered.length === 0) {
         container.innerHTML = `<div class="coffee-card" style="text-align:center;grid-column:1/-1;justify-content:center;align-items:center;">Nessun elemento nel magazzino ${currentMagazzino}</div>`;
+        aggiornaBottoneAnnulla();
         return;
     }
     
@@ -159,4 +159,108 @@ async function loadDashboard() {
             </div>
         </div>
     `}).join('');
+    
+    // Aggiorna stato bottone annulla
+    aggiornaBottoneAnnulla();
+}
+
+// ============================
+// TOAST + ANNULLA ULTIMO CONSUMO
+// ============================
+let toastTimer = null;
+
+function mostraToastConsumo(nome, magazzino) {
+    const toast = document.getElementById('toast-consumo');
+    if (!toast) return;
+    
+    toast.querySelector('.toast-text').textContent = `Consumato 1 ${nome} (${magazzino})`;
+    toast.classList.add('show');
+    
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 8000);
+}
+
+function nascondiToast() {
+    const toast = document.getElementById('toast-consumo');
+    if (toast) toast.classList.remove('show');
+}
+
+async function aggiornaBottoneAnnulla() {
+    const btn = document.getElementById('btn-annulla-ultimo');
+    if (!btn) return;
+    
+    try {
+        const res = await fetch('/api/log/ultimo-consumo');
+        const data = await res.json();
+        
+        if (data.annullabile) {
+            btn.style.display = 'inline-flex';
+            btn.dataset.logId = data.log.id;
+            btn.title = `Annulla: ${data.log.nome} (${data.log.magazzino})`;
+        } else {
+            btn.style.display = 'none';
+            delete btn.dataset.logId;
+        }
+    } catch (e) {
+        btn.style.display = 'none';
+    }
+}
+
+async function annullaUltimoConsumo(logId) {
+    if (!logId) return;
+    
+    if (!confirm('Annullare l\'ultimo consumo?\n\nVerrà ripristinata 1 capsula.')) return;
+    
+    const res = await fetch(`/api/log/annulla-consumo/${logId}`, { method: 'POST' });
+    if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Errore');
+        return;
+    }
+    
+    const result = await res.json();
+    nascondiToast();
+    loadDashboard();
+    loadManageList();
+    
+    // Feedback
+    const toast = document.getElementById('toast-consumo');
+    if (toast) {
+        toast.querySelector('.toast-text').textContent = `Ripristinato: +1 ${result.nome} (${result.magazzino})`;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+}
+
+// Wire-up dei bottoni (una volta sola, dopo che il DOM è pronto)
+function initUndoConsumo() {
+    const btnAnnulla = document.getElementById('btn-annulla-ultimo');
+    if (btnAnnulla) {
+        btnAnnulla.addEventListener('click', () => {
+            const logId = btnAnnulla.dataset.logId;
+            if (logId) annullaUltimoConsumo(logId);
+        });
+    }
+    
+    const toastUndo = document.getElementById('toast-undo-btn');
+    if (toastUndo) {
+        toastUndo.addEventListener('click', () => {
+            const btn = document.getElementById('btn-annulla-ultimo');
+            const logId = btn?.dataset.logId;
+            if (logId) {
+                annullaUltimoConsumo(logId);
+            } else {
+                nascondiToast();
+            }
+        });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUndoConsumo);
+} else {
+    initUndoConsumo();
 }

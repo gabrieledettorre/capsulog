@@ -376,6 +376,83 @@ body {
     margin-bottom: 0.375rem;
 }
 
+/* ============================
+   BOTTONE ANNULLA ULTIMO
+   ============================ */
+.btn-annulla-ultimo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-annulla-ultimo:hover {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+}
+
+/* ============================
+   TOAST CONSUMO
+   ============================ */
+.toast-consumo {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    z-index: 2000;
+    transform: translateY(120%);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    max-width: 380px;
+}
+
+.toast-consumo.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toast-undo {
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+}
+
+.toast-undo:hover {
+    opacity: 0.85;
+}
+
 .coffee-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
 .coffee-name { font-size: 1rem; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; }
 .coffee-marca { color: var(--accent); font-size: 0.65rem; font-weight: 500; text-transform: uppercase; margin-top: 0.25rem; }

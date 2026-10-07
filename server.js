@@ -17,9 +17,9 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, 'capsulog.db');
 const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL'); // Migliore concorrenza e crash safety
+db.pragma('journal_mode = WAL');
 
-// Schema
+// Schema (con dettagli già incluso)
 db.exec(`
     CREATE TABLE IF NOT EXISTS caffe (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +48,8 @@ db.exec(`
         da_magazzino TEXT,
         a_magazzino TEXT,
         quantita INTEGER,
-        timestamp TEXT DEFAULT (datetime('now'))
+        timestamp TEXT DEFAULT (datetime('now')),
+        dettagli TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_log_timestamp ON log(timestamp);
@@ -56,8 +57,18 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_log_nome ON log(nome);
 `);
 
+// Migrazione una tantum: aggiungi colonna dettagli se manca (db vecchi)
+(function migraDettagli() {
+    const columns = db.prepare("PRAGMA table_info(log)").all();
+    const hasDettagli = columns.some(c => c.name === 'dettagli');
+    if (!hasDettagli) {
+        db.exec("ALTER TABLE log ADD COLUMN dettagli TEXT");
+        console.log('✓ Migrazione: aggiunta colonna "dettagli" alla tabella log');
+    }
+})();
+
 // ============================
-// SEED INIZIALE (solo se vuoto)
+// SEED INIZIALE
 // ============================
 const countCaffe = db.prepare('SELECT COUNT(*) as n FROM caffe').get();
 if (countCaffe.n === 0) {
@@ -69,46 +80,6 @@ if (countCaffe.n === 0) {
     insert.run('Espresso Bar', 'Lavazza', 'Intenso', 'Caffè', 'Casa', 4, '#6f4e37', 'Intensità 8/12');
     insert.run('Ginseng', 'Nescafé', 'Dolce', 'Bevande Calde', 'Ufficio', 2, '#c9a227', 'Delicato');
     console.log('Database inizializzato con dati di esempio');
-}
-
-// ============================
-// MIGRAZIONE da log.json (una tantum)
-// ============================
-const OLD_LOG_FILE = path.join(__dirname, 'log.json');
-if (fs.existsSync(OLD_LOG_FILE)) {
-    try {
-        const oldLogs = JSON.parse(fs.readFileSync(OLD_LOG_FILE, 'utf8'));
-        const countLog = db.prepare('SELECT COUNT(*) as n FROM log').get();
-        if (countLog.n === 0 && oldLogs.length > 0) {
-            const insertLog = db.prepare(`
-                INSERT INTO log (tipo, caffe_id, nome, marca, categoria, colore, magazzino, da_magazzino, a_magazzino, quantita, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `);
-            const tx = db.transaction((logs) => {
-                for (const l of logs) {
-                    insertLog.run(
-                        l.tipo,
-                        l.caffeId || null,
-                        l.nome || null,
-                        l.marca || null,
-                        l.categoria || null,
-                        l.colore || null,
-                        l.magazzino || null,
-                        l.daMagazzino || null,
-                        l.aMagazzino || null,
-                        l.quantita || 0,
-                        l.timestamp || new Date().toISOString()
-                    );
-                }
-            });
-            tx(oldLogs);
-            console.log(`Migrati ${oldLogs.length} log da log.json`);
-            fs.renameSync(OLD_LOG_FILE, OLD_LOG_FILE + '.migrato');
-            console.log(`File log.json rinominato in log.json.migrato (puoi eliminarlo)`);
-        }
-    } catch (e) {
-        console.warn('Migrazione log.json fallita:', e.message);
-    }
 }
 
 // ============================
@@ -132,7 +103,6 @@ function logEvento(tipo, dettagli) {
     );
 }
 
-// Converti row DB → oggetto API (camelCase)
 function rowToCaffe(row) {
     if (!row) return null;
     return {
@@ -274,7 +244,6 @@ app.put('/api/caffe/:id', (req, res) => {
     const nuovoColore = colore !== undefined ? colore : esistente.colore;
     const nuoveNote = note !== undefined ? (note ? note.trim() : null) : esistente.note;
 
-    // Transazione: aggiorna questa voce + propaga catalogo agli altri magazzini con lo stesso nome
     const tx = db.transaction(() => {
         db.prepare(`
             UPDATE caffe 
@@ -405,7 +374,7 @@ app.delete('/api/caffe/catalogo/:nome', (req, res) => {
 });
 
 // ============================
-// API LOG & STATISTICHE
+// API LOG
 // ============================
 
 app.get('/api/log', (req, res) => {
@@ -432,106 +401,244 @@ app.get('/api/log', (req, res) => {
     res.json(rows.map(rowToLog));
 });
 
+// ============================
+// API UNDO CONSUMO
+// ============================
+
+// GET - Ultimo consumo annullabile
+app.get('/api/log/ultimo-consumo', (req, res) => {
+    try {
+        const ultimo = db.prepare(`
+            SELECT * FROM log 
+            WHERE tipo = 'consumo' 
+            ORDER BY id DESC 
+            LIMIT 1
+        `).get();
+        
+        if (!ultimo) {
+            return res.json({ annullabile: false });
+        }
+        
+        const giàAnnullato = db.prepare(`
+            SELECT * FROM log 
+            WHERE tipo = 'consumo_annullato' 
+              AND dettagli LIKE ?
+            LIMIT 1
+        `).get(`%"consumo_id":${ultimo.id}%`);
+        
+        if (giàAnnullato) {
+            return res.json({ annullabile: false });
+        }
+        
+        res.json({
+            annullabile: true,
+            log: rowToLog(ultimo)
+        });
+    } catch (e) {
+        console.error('Errore ultimo-consumo:', e);
+        res.status(500).json({ error: 'Errore server: ' + e.message });
+    }
+});
+
+// POST - Annulla un consumo
+app.post('/api/log/annulla-consumo/:logId', (req, res) => {
+    try {
+        const logId = parseInt(req.params.logId);
+        const logConsumo = db.prepare("SELECT * FROM log WHERE id = ? AND tipo = 'consumo'").get(logId);
+        
+        if (!logConsumo) {
+            return res.status(404).json({ error: 'Consumo non trovato' });
+        }
+        
+        const ultimo = db.prepare(`
+            SELECT * FROM log WHERE tipo = 'consumo' ORDER BY id DESC LIMIT 1
+        `).get();
+        
+        if (!ultimo || ultimo.id !== logId) {
+            return res.status(400).json({ error: 'Puoi annullare solo l\'ultimo consumo' });
+        }
+        
+        const giàAnnullato = db.prepare(`
+            SELECT * FROM log 
+            WHERE tipo = 'consumo_annullato' 
+              AND dettagli LIKE ?
+            LIMIT 1
+        `).get(`%"consumo_id":${logId}%`);
+        
+        if (giàAnnullato) {
+            return res.status(400).json({ error: 'Consumo già annullato' });
+        }
+        
+        const caffe = db.prepare('SELECT * FROM caffe WHERE id = ?').get(logConsumo.caffe_id);
+        if (!caffe) {
+            return res.status(404).json({ error: 'Caffè non più in catalogo' });
+        }
+        
+        const qty = logConsumo.quantita || 1;
+        
+        db.prepare('UPDATE caffe SET quantita = quantita + ? WHERE id = ?').run(qty, caffe.id);
+        
+        db.prepare(`
+            INSERT INTO log (tipo, caffe_id, nome, marca, categoria, colore, magazzino, quantita, dettagli)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            'consumo_annullato',
+            caffe.id,
+            caffe.nome,
+            caffe.marca,
+            caffe.categoria,
+            caffe.colore,
+            caffe.magazzino,
+            qty,
+            JSON.stringify({ consumo_id: logId })
+        );
+        
+        res.json({ 
+            success: true, 
+            ripristinato: qty,
+            nome: caffe.nome,
+            magazzino: caffe.magazzino
+        });
+    } catch (e) {
+        console.error('Errore annulla-consumo:', e);
+        res.status(500).json({ error: 'Errore server: ' + e.message });
+    }
+});
+
+// ============================
+// API STATISTICHE (con sottrazione annullamenti)
+// ============================
+
 app.get('/api/statistiche', (req, res) => {
-    const giorni = parseInt(req.query.giorni) || 30;
+    try {
+        const giorni = parseInt(req.query.giorni) || 30;
 
-    // Calcolo date in formato SQLite (YYYY-MM-DD HH:MM:SS)
-    const oggi = new Date();
-    const al = oggi.toISOString().slice(0, 19).replace('T', ' ');
-    const dalDate = new Date();
-    dalDate.setDate(dalDate.getDate() - giorni + 1);
-    dalDate.setHours(0, 0, 0, 0);
-    const dal = dalDate.toISOString().slice(0, 19).replace('T', ' ');
+        const oggi = new Date();
+        const al = oggi.toISOString().slice(0, 19).replace('T', ' ');
+        const dalDate = new Date();
+        dalDate.setDate(dalDate.getDate() - giorni + 1);
+        dalDate.setHours(0, 0, 0, 0);
+        const dal = dalDate.toISOString().slice(0, 19).replace('T', ' ');
 
-    // Consumi nel periodo
-    const consumi = db.prepare(`
-        SELECT * FROM log 
-        WHERE tipo = 'consumo' AND timestamp >= ? AND timestamp <= ?
-    `).all(dal, al);
+        // Consumi - annullamenti, per giorno (heatmap)
+        const heatmapRows = db.prepare(`
+            SELECT 
+                DATE(timestamp, 'localtime') as giorno,
+                SUM(CASE WHEN tipo = 'consumo' THEN quantita ELSE -quantita END) as totale
+            FROM log 
+            WHERE tipo IN ('consumo', 'consumo_annullato') 
+              AND timestamp >= ? AND timestamp <= ?
+            GROUP BY DATE(timestamp, 'localtime')
+        `).all(dal, al);
+        
+        const heatmap = {};
+        heatmapRows.forEach(r => { 
+            if (r.totale > 0) {
+                heatmap[r.giorno] = r.totale;
+            }
+        });
 
-    const refill = db.prepare(`
-        SELECT * FROM log 
-        WHERE tipo = 'refill' AND timestamp >= ? AND timestamp <= ?
-    `).all(dal, al);
+        // Totale consumato (consumi - annullamenti)
+        const totaleConsumatoRow = db.prepare(`
+            SELECT SUM(CASE WHEN tipo = 'consumo' THEN quantita ELSE -quantita END) as totale
+            FROM log 
+            WHERE tipo IN ('consumo', 'consumo_annullato') 
+              AND timestamp >= ? AND timestamp <= ?
+        `).get(dal, al);
+        const totaleConsumato = totaleConsumatoRow.totale || 0;
 
-    const trasferimenti = db.prepare(`
-        SELECT * FROM log 
-        WHERE tipo = 'trasferimento' AND timestamp >= ? AND timestamp <= ?
-    `).all(dal, al);
+        // Top caffè consumati (consumi - annullamenti)
+        const topCaffeRows = db.prepare(`
+            SELECT 
+                nome,
+                marca,
+                MAX(colore) as colore,
+                SUM(CASE WHEN tipo = 'consumo' THEN quantita ELSE -quantita END) as quantita,
+                SUM(CASE WHEN tipo = 'consumo' AND magazzino = 'Ufficio' THEN quantita 
+                         WHEN tipo = 'consumo_annullato' AND magazzino = 'Ufficio' THEN -quantita 
+                         ELSE 0 END) as ufficio,
+                SUM(CASE WHEN tipo = 'consumo' AND magazzino = 'Casa' THEN quantita 
+                         WHEN tipo = 'consumo_annullato' AND magazzino = 'Casa' THEN -quantita 
+                         ELSE 0 END) as casa
+            FROM log 
+            WHERE tipo IN ('consumo', 'consumo_annullato') 
+              AND timestamp >= ? AND timestamp <= ?
+            GROUP BY nome, marca
+            HAVING quantita > 0
+            ORDER BY quantita DESC
+        `).all(dal, al);
 
-    // Heatmap: consumi per giorno
-    const heatmapRows = db.prepare(`
-        SELECT DATE(timestamp) as giorno, SUM(quantita) as totale
-        FROM log 
-        WHERE tipo = 'consumo' AND timestamp >= ? AND timestamp <= ?
-        GROUP BY DATE(timestamp)
-    `).all(dal, al);
-    const heatmap = {};
-    heatmapRows.forEach(r => { heatmap[r.giorno] = r.totale; });
+        // Top refill
+        const topRefillRows = db.prepare(`
+            SELECT 
+                nome,
+                marca,
+                MAX(colore) as colore,
+                SUM(quantita) as quantita
+            FROM log 
+            WHERE tipo = 'refill' AND timestamp >= ? AND timestamp <= ?
+            GROUP BY nome, marca
+            ORDER BY quantita DESC
+        `).all(dal, al);
 
-    // Top caffè consumati
-    const topCaffeRows = db.prepare(`
-        SELECT 
-            nome,
-            marca,
-            MAX(colore) as colore,
-            SUM(quantita) as quantita,
-            SUM(CASE WHEN magazzino = 'Ufficio' THEN quantita ELSE 0 END) as ufficio,
-            SUM(CASE WHEN magazzino = 'Casa' THEN quantita ELSE 0 END) as casa
-        FROM log 
-        WHERE tipo = 'consumo' AND timestamp >= ? AND timestamp <= ?
-        GROUP BY nome, marca
-        ORDER BY quantita DESC
-    `).all(dal, al);
+        // Per categoria (consumi - annullamenti)
+        const perCategoriaRows = db.prepare(`
+            SELECT categoria, 
+                   SUM(CASE WHEN tipo = 'consumo' THEN quantita ELSE -quantita END) as quantita
+            FROM log 
+            WHERE tipo IN ('consumo', 'consumo_annullato') 
+              AND timestamp >= ? AND timestamp <= ?
+            GROUP BY categoria
+        `).all(dal, al);
+        
+        const perCategoria = {};
+        perCategoriaRows.forEach(r => { 
+            if (r.quantita > 0) perCategoria[r.categoria || 'Altro'] = r.quantita; 
+        });
 
-    // Top refill
-    const topRefillRows = db.prepare(`
-        SELECT 
-            nome,
-            marca,
-            MAX(colore) as colore,
-            SUM(quantita) as quantita
-        FROM log 
-        WHERE tipo = 'refill' AND timestamp >= ? AND timestamp <= ?
-        GROUP BY nome, marca
-        ORDER BY quantita DESC
-    `).all(dal, al);
+        // Per magazzino (consumi - annullamenti)
+        const perMagazzinoRows = db.prepare(`
+            SELECT magazzino, 
+                   SUM(CASE WHEN tipo = 'consumo' THEN quantita ELSE -quantita END) as quantita
+            FROM log 
+            WHERE tipo IN ('consumo', 'consumo_annullato') 
+              AND timestamp >= ? AND timestamp <= ?
+            GROUP BY magazzino
+        `).all(dal, al);
+        
+        const perMagazzino = { Ufficio: 0, Casa: 0 };
+        perMagazzinoRows.forEach(r => { 
+            if (r.magazzino) perMagazzino[r.magazzino] = Math.max(0, r.quantita);
+        });
 
-    // Per categoria
-    const perCategoriaRows = db.prepare(`
-        SELECT categoria, SUM(quantita) as quantita
-        FROM log 
-        WHERE tipo = 'consumo' AND timestamp >= ? AND timestamp <= ?
-        GROUP BY categoria
-    `).all(dal, al);
-    const perCategoria = {};
-    perCategoriaRows.forEach(r => { perCategoria[r.categoria || 'Altro'] = r.quantita; });
+        // Trasferimenti
+        const trasferimentiRow = db.prepare(`
+            SELECT COUNT(*) as n FROM log 
+            WHERE tipo = 'trasferimento' AND timestamp >= ? AND timestamp <= ?
+        `).get(dal, al);
 
-    // Per magazzino
-    const perMagazzinoRows = db.prepare(`
-        SELECT magazzino, SUM(quantita) as quantita
-        FROM log 
-        WHERE tipo = 'consumo' AND timestamp >= ? AND timestamp <= ?
-        GROUP BY magazzino
-    `).all(dal, al);
-    const perMagazzino = { Ufficio: 0, Casa: 0 };
-    perMagazzinoRows.forEach(r => { if (r.magazzino) perMagazzino[r.magazzino] = r.quantita; });
+        // Refill totale
+        const refillRow = db.prepare(`
+            SELECT SUM(quantita) as totale FROM log 
+            WHERE tipo = 'refill' AND timestamp >= ? AND timestamp <= ?
+        `).get(dal, al);
 
-    const totaleConsumato = consumi.reduce((s, l) => s + (l.quantita || 0), 0);
-    const totaleRefill = refill.reduce((s, l) => s + (l.quantita || 0), 0);
-
-    res.json({
-        periodo: { dal, al, giorni },
-        totaleConsumato,
-        mediaGiornaliera: (totaleConsumato / giorni).toFixed(2),
-        totaleRefill,
-        totaleTrasferimenti: trasferimenti.length,
-        heatmap,
-        topCaffe: topCaffeRows,
-        topRefill: topRefillRows,
-        perCategoria,
-        perMagazzino
-    });
+        res.json({
+            periodo: { dal, al, giorni },
+            totaleConsumato: Math.max(0, totaleConsumato),
+            mediaGiornaliera: (Math.max(0, totaleConsumato) / giorni).toFixed(2),
+            totaleRefill: refillRow.totale || 0,
+            totaleTrasferimenti: trasferimentiRow.n || 0,
+            heatmap,
+            topCaffe: topCaffeRows,
+            topRefill: topRefillRows,
+            perCategoria,
+            perMagazzino
+        });
+    } catch (e) {
+        console.error('Errore statistiche:', e);
+        res.status(500).json({ error: 'Errore server: ' + e.message });
+    }
 });
 
 // ============================

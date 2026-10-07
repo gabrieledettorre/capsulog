@@ -17,7 +17,6 @@ async function loadManageList() {
         return;
     }
     
-    // Raggruppa per nome (catalogo centrale)
     const grouped = {};
     caffe.forEach(c => {
         if (!grouped[c.nome]) {
@@ -37,14 +36,12 @@ async function loadManageList() {
         if (c.magazzino === 'Casa') grouped[c.nome].casa = c;
     });
     
-    // Trasforma in array per sorting/filtering
     let items = Object.keys(grouped).map(nome => ({
         nome,
         ...grouped[nome],
         totale: (grouped[nome].ufficio?.quantita || 0) + (grouped[nome].casa?.quantita || 0)
     }));
     
-    // Filtro ricerca
     if (manageSearch.trim()) {
         const q = manageSearch.toLowerCase().trim();
         items = items.filter(item => {
@@ -59,7 +56,6 @@ async function loadManageList() {
         });
     }
     
-    // Sorting
     items.sort((a, b) => {
         let aVal, bVal;
         switch (manageSort.field) {
@@ -162,7 +158,6 @@ function updateManageSortUI() {
     });
 }
 
-// --- Init ricerca + sort (una sola volta) ---
 function initManageControls() {
     document.querySelectorAll('.manage-sort-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -191,14 +186,22 @@ function initManageControls() {
     }
 }
 
+// ============================
+// CONSUMA (con toast + undo)
+// ============================
 window.consuma = async (id) => {
     const res = await fetch(`/api/caffe/${id}/consuma`, { method: 'PATCH' });
     if (res.status === 400) {
         alert('Scorta esaurita');
-    } else {
-        loadDashboard();
-        loadManageList();
+        return;
     }
+    const caffe = await res.json();
+    
+    loadDashboard();
+    loadManageList();
+    
+    mostraToastConsumo(caffe.nome, caffe.magazzino);
+    aggiornaBottoneAnnulla();
 };
 
 window.settaQuantita = async (id) => {
@@ -249,7 +252,6 @@ window.deleteCatalogo = async (nome) => {
     }
 };
 
-// Inizializza i controlli al primo caricamento
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initManageControls);
 } else {
