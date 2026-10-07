@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   capsulog:
-    build: .
+    image: ghcr.io/gabrieledettorre/capsulog:latest
     container_name: capsulog
     ports:
       - "4316:3000"
