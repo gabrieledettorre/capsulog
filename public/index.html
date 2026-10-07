@@ -62,12 +62,6 @@
                 </button>
             </div>
 
-            <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-                <button id="btn-annulla-ultimo" class="btn-annulla-ultimo" style="display:none;" title="Annulla ultimo consumo">
-                    <i class="ri-arrow-go-back-line"></i> Annulla ultimo consumo
-                </button>
-            </div>
-
             <div class="stats-grid" id="stats"></div>
             <div class="sorting-bar">
                 <div class="sort-group">
@@ -165,40 +159,52 @@
         </div>
 
         <!-- Pagina Impostazioni -->
-        <div id="settings-page" class="page">
-            <div class="settings-card">
-                <h2><i class="ri-settings-4-line"></i> Preferenze</h2>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label"><i class="ri-alert-line"></i> Soglia scorta minima</div>
-                        <div class="setting-description">Avvisa quando la quantità è inferiore o uguale a questa cifra</div>
-                    </div>
-                    <input type="number" id="low-stock-threshold" value="3" style="width: 80px;">
-                </div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label"><i class="ri-download-2-line"></i> Esporta dati</div>
-                        <div class="setting-description">Download backup JSON</div>
-                    </div>
-                    <button id="export-data" class="btn btn-secondary"><i class="ri-download-line"></i> Esporta</button>
-                </div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label"><i class="ri-upload-2-line"></i> Importa dati</div>
-                        <div class="setting-description">Ripristina inventario da file JSON</div>
-                    </div>
-                    <input type="file" id="import-file" accept=".json" style="width: auto;">
-                </div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label"><i class="ri-delete-bin-line"></i> Reset completo</div>
-                        <div class="setting-description">Cancella l'intero archivio</div>
-                    </div>
-                    <button id="reset-data" class="btn btn-danger"><i class="ri-delete-bin-line"></i> Reset</button>
-                </div>
+<div id="settings-page" class="page">
+    <div class="settings-card">
+        <h2><i class="ri-settings-4-line"></i> Preferenze</h2>
+        <div class="setting-item">
+            <div>
+                <div class="setting-label"><i class="ri-alert-line"></i> Soglia scorta minima</div>
+                <div class="setting-description">Avvisa quando la quantità è inferiore o uguale a questa cifra</div>
             </div>
+            <input type="number" id="low-stock-threshold" value="3" style="width: 80px;">
+        </div>
+        <div class="setting-item">
+            <div>
+                <div class="setting-label"><i class="ri-download-2-line"></i> Esporta dati</div>
+                <div class="setting-description">Download backup JSON</div>
+            </div>
+            <button id="export-data" class="btn btn-secondary"><i class="ri-download-line"></i> Esporta</button>
+        </div>
+        <div class="setting-item">
+            <div>
+                <div class="setting-label"><i class="ri-upload-2-line"></i> Importa dati</div>
+                <div class="setting-description">Ripristina inventario da file JSON</div>
+            </div>
+            <input type="file" id="import-file" accept=".json" style="width: auto;">
+        </div>
+        <div class="setting-item">
+            <div>
+                <div class="setting-label"><i class="ri-delete-bin-line"></i> Reset completo</div>
+                <div class="setting-description">Cancella l'intero archivio</div>
+            </div>
+            <button id="reset-data" class="btn btn-danger"><i class="ri-delete-bin-line"></i> Reset</button>
         </div>
     </div>
+
+
+    <div class="settings-card" style="margin-top:1.5rem;">
+        <h2><i class="ri-tools-line"></i> Azioni rapide</h2>
+        <div class="setting-item">
+            <div>
+                <div class="setting-label"><i class="ri-arrow-go-back-line"></i> Annulla ultimo consumo</div>
+            </div>
+            <button id="btn-annulla-ultimo" class="btn btn-secondary" style="display:none;">
+                <i class="ri-arrow-go-back-line"></i> Annulla
+            </button>
+        </div>
+    </div>
+</div>
 
     <!-- Modal Nuovo/Modifica Caffè -->
     <div id="coffee-modal" class="modal">
